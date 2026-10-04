@@ -309,8 +309,8 @@ app.post("/upload", upload.single("resume"), async (req, res) => {
 // START SERVER
 // ==========================================
 
-app.listen(5000, () => {
+app.listen(process.env.PORT || 5000, "0.0.0.0", () => {
   console.log(
-    "Backend running on http://localhost:5000"
+    `Backend running on port ${process.env.PORT || 5000}`
   );
 });
