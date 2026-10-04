@@ -2,315 +2,425 @@ const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
 const fs = require("fs");
+const path = require("path");
 const { PDFParse } = require("pdf-parse");
+require("dotenv").config();
 
 const app = express();
 
 app.use(cors());
+app.use(express.json());
+
+// -----------------------------
+// Upload folder
+// -----------------------------
+
+const uploadDir = path.join(__dirname, "uploads");
+
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// -----------------------------
+// Multer configuration
+// -----------------------------
 
 const upload = multer({
-  dest: "uploads/"
+  dest: uploadDir,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10 MB
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === "application/pdf") {
+      cb(null, true);
+    } else {
+      cb(new Error("Only PDF files are allowed."));
+    }
+  },
 });
+
+// -----------------------------
+// Home route
+// -----------------------------
 
 app.get("/", (req, res) => {
   res.send("Resume Analyzer Backend is running!");
 });
 
-app.post("/upload", upload.single("resume"), async (req, res) => {
-  console.log("Resume received:", req.file.originalname);
+// -----------------------------
+// Skills list
+// -----------------------------
 
-  try {
-    // 1. Read PDF
-    const data = fs.readFileSync(req.file.path);
+const skillList = [
+  "Python",
+  "Java",
+  "C++",
+  "C",
+  "JavaScript",
+  "HTML",
+  "CSS",
+  "React",
+  "Node.js",
+  "Express",
+  "SQL",
+  "MySQL",
+  "MongoDB",
+  "Power BI",
+  "Tableau",
+  "Excel",
+  "Machine Learning",
+  "Deep Learning",
+  "Artificial Intelligence",
+  "AI",
+  "Data Science",
+  "Data Analysis",
+  "Data Visualization",
+  "Big Data",
+  "BigQuery",
+  "Cloud Computing",
+  "AWS",
+  "Azure",
+  "Google Cloud",
+  "Git",
+  "GitHub",
+  "Docker",
+  "Cybersecurity",
+  "Linux",
+  "R",
+  "NLP",
+  "TensorFlow",
+  "PyTorch",
+  "Pandas",
+  "NumPy",
+  "Scikit-learn",
+];
 
-    // 2. Extract text
-    const parser = new PDFParse({
-      data: data
-    });
+// -----------------------------
+// Find skills
+// -----------------------------
 
-    const result = await parser.getText();
+function findSkills(text) {
+  const lowerText = text.toLowerCase();
 
-    await parser.destroy();
+  return skillList.filter((skill) =>
+    lowerText.includes(skill.toLowerCase())
+  );
+}
 
-    // 3. Delete temporary PDF
-    fs.unlinkSync(req.file.path);
+// -----------------------------
+// Calculate resume analysis
+// -----------------------------
 
-    console.log("PDF text extracted successfully!");
-    console.log("EXTRACTED TEXT:", result.text.substring(0, 1000));
+function analyzeResume(text) {
+  const lowerText = text.toLowerCase();
 
-    // 4. Convert text to lowercase
-    const resumeText = result.text.toLowerCase();
+  // Skills
+  const skills = findSkills(text);
 
-    // ==========================================
-    // SKILLS
-    // ==========================================
+  // -----------------------------
+  // Skills score
+  // -----------------------------
 
-    const skillList = [
-      "python",
-      "java",
-      "javascript",
-      "react",
-      "html",
-      "css",
-      "sql",
-      "machine learning",
-      "artificial intelligence",
-      "data science",
-      "data analysis",
-      "data visualization",
-      "data visualtion",
-      "bigquery",
-      "cloud storage",
-      "cloud computing",
-      "power bi",
-      "excel",
-      "git",
-      "github",
-      "cybersecurity",
-      "communication",
-      "time management",
-      "problem-solving",
-      "problem solving",
-      "analytical thinking",
-      "soft skills"
-    ];
+  let skillsScore = Math.min(100, skills.length * 10);
 
-    const skillsFound = [
-      ...new Set(
-        skillList.filter((skill) =>
-          resumeText.includes(skill)
-        )
-      )
-    ];
-
-    // ==========================================
-    // CATEGORY CHECKS
-    // ==========================================
-
-    const hasEducation =
-      resumeText.includes("education") ||
-      resumeText.includes("bachelor") ||
-      resumeText.includes("b.sc") ||
-      resumeText.includes("degree") ||
-      resumeText.includes("university");
-
-    const hasExperience =
-      resumeText.includes("experience") ||
-      resumeText.includes("internship") ||
-      resumeText.includes("worked") ||
-      resumeText.includes("employment");
-
-    const hasProjects =
-      resumeText.includes("project") ||
-      resumeText.includes("projects");
-
-    const hasCertification =
-      resumeText.includes("certification") ||
-      resumeText.includes("certifications") ||
-      resumeText.includes("certificate") ||
-      resumeText.includes("virtual internship");
-
-    const hasEmail =
-      resumeText.includes("@");
-
-    const hasPhone =
-      /\b\d{10}\b/.test(resumeText);
-
-    const hasLinkedIn =
-      resumeText.includes("linkedin");
-
-    const hasSummary =
-      resumeText.includes("summary") ||
-      resumeText.includes("profile") ||
-      resumeText.includes("objective");
-
-    const hasAchievements =
-      resumeText.includes("achievement") ||
-      resumeText.includes("achievements") ||
-      resumeText.includes("award") ||
-      resumeText.includes("awards");
-
-    // ==========================================
-    // SCORE
-    // ==========================================
-
-    let score = 0;
-
-    // Skills - 20
-    if (skillsFound.length >= 8) {
-      score += 20;
-    } else if (skillsFound.length >= 5) {
-      score += 15;
-    } else if (skillsFound.length >= 3) {
-      score += 10;
-    } else if (skillsFound.length > 0) {
-      score += 5;
-    }
-
-    // Education - 15
-    if (hasEducation) {
-      score += 15;
-    }
-
-    // Experience - 15
-    if (hasExperience) {
-      score += 15;
-    }
-
-    // Projects - 15
-    if (hasProjects) {
-      score += 15;
-    }
-
-    // Certifications - 10
-    if (hasCertification) {
-      score += 10;
-    }
-
-    // Contact information - 10
-    if (hasEmail && hasPhone) {
-      score += 10;
-    } else if (hasEmail || hasPhone) {
-      score += 5;
-    }
-
-    // LinkedIn - 5
-    if (hasLinkedIn) {
-      score += 5;
-    }
-
-    // Summary - 5
-    if (hasSummary) {
-      score += 5;
-    }
-
-    // Achievements - 5
-    if (hasAchievements) {
-      score += 5;
-    }
-
-    if (score > 100) {
-      score = 100;
-    }
-
-    // ==========================================
-    // STRENGTHS
-    // ==========================================
-
-    const strengths = [];
-
-    if (skillsFound.length >= 5) {
-      strengths.push(
-        "Good technical and professional skill coverage."
-      );
-    } else if (skillsFound.length > 0) {
-      strengths.push(
-        "Relevant skills are included in the resume."
-      );
-    }
-
-    if (hasExperience) {
-      strengths.push(
-        "Practical experience or internship is included."
-      );
-    }
-
-    if (hasEducation) {
-      strengths.push(
-        "Educational qualifications are clearly mentioned."
-      );
-    }
-
-    if (hasLinkedIn) {
-      strengths.push(
-        "LinkedIn profile is included."
-      );
-    }
-
-    if (hasSummary) {
-      strengths.push(
-        "Resume includes a professional summary."
-      );
-    }
-
-    if (strengths.length === 0) {
-      strengths.push(
-        "Resume information was successfully extracted."
-      );
-    }
-
-    // ==========================================
-    // IMPROVEMENTS
-    // ==========================================
-
-    const improvements = [];
-
-    if (!hasProjects) {
-      improvements.push(
-        "Add relevant academic or personal projects."
-      );
-    }
-
-    if (!hasCertification) {
-      improvements.push(
-        "Add relevant certifications."
-      );
-    }
-
-    if (!hasAchievements) {
-      improvements.push(
-        "Add measurable achievements and results."
-      );
-    }
-
-    if (!hasLinkedIn) {
-      improvements.push(
-        "Add your LinkedIn profile."
-      );
-    }
-
-    if (skillsFound.length < 5) {
-      improvements.push(
-        "Add more relevant technical and professional skills."
-      );
-    }
-
-    if (improvements.length === 0) {
-      improvements.push(
-        "Keep adding measurable results to your experience and projects."
-      );
-    }
-
-    // ==========================================
-    // SEND RESULT
-    // ==========================================
-
-    res.json({
-      success: true,
-      score: score,
-      skills: skillsFound,
-      strengths: strengths,
-      improvements: improvements,
-      text: result.text
-    });
-
-  } catch (error) {
-
-    console.error("PDF ERROR:", error);
-
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+  if (skills.length >= 5) {
+    skillsScore = Math.max(skillsScore, 70);
   }
+
+  if (skills.length >= 8) {
+    skillsScore = Math.max(skillsScore, 85);
+  }
+
+  if (skills.length >= 10) {
+    skillsScore = 100;
+  }
+
+  // -----------------------------
+  // Experience score
+  // -----------------------------
+
+  const experienceKeywords = [
+    "experience",
+    "internship",
+    "intern",
+    "worked",
+    "work experience",
+    "employment",
+    "project",
+    "projects",
+  ];
+
+  const experienceFound = experienceKeywords.some((keyword) =>
+    lowerText.includes(keyword)
+  );
+
+  let experienceScore = experienceFound ? 80 : 40;
+
+  if (
+    lowerText.includes("internship") ||
+    lowerText.includes("experience")
+  ) {
+    experienceScore = 90;
+  }
+
+  if (lowerText.includes("project") || lowerText.includes("projects")) {
+    experienceScore = Math.min(100, experienceScore + 10);
+  }
+
+  // -----------------------------
+  // Education score
+  // -----------------------------
+
+  const educationKeywords = [
+    "education",
+    "bachelor",
+    "b.sc",
+    "bsc",
+    "degree",
+    "university",
+    "college",
+    "master",
+    "m.sc",
+    "msc",
+    "school",
+  ];
+
+  const educationFound = educationKeywords.some((keyword) =>
+    lowerText.includes(keyword)
+  );
+
+  const educationScore = educationFound ? 90 : 40;
+
+  // -----------------------------
+  // Formatting score
+  // -----------------------------
+
+  let formattingScore = 60;
+
+  if (text.length > 500) {
+    formattingScore += 10;
+  }
+
+  if (text.length > 1000) {
+    formattingScore += 10;
+  }
+
+  if (lowerText.includes("email")) {
+    formattingScore += 5;
+  }
+
+  if (
+    lowerText.includes("phone") ||
+    /\b\d{10}\b/.test(text)
+  ) {
+    formattingScore += 5;
+  }
+
+  if (
+    lowerText.includes("linkedin") ||
+    lowerText.includes("github")
+  ) {
+    formattingScore += 10;
+  }
+
+  formattingScore = Math.min(100, formattingScore);
+
+  // -----------------------------
+  // Overall score
+  // -----------------------------
+
+  const score = Math.round(
+    (skillsScore +
+      experienceScore +
+      educationScore +
+      formattingScore) /
+      4
+  );
+
+  // -----------------------------
+  // Strengths
+  // -----------------------------
+
+  const strengths = [];
+
+  if (skillsScore >= 70) {
+    strengths.push("Good range of technical skills.");
+  }
+
+  if (experienceScore >= 70) {
+    strengths.push("Experience or project information is present.");
+  }
+
+  if (educationScore >= 70) {
+    strengths.push("Education details are clearly mentioned.");
+  }
+
+  if (formattingScore >= 70) {
+    strengths.push("Resume has a reasonably good structure.");
+  }
+
+  if (skills.length > 0) {
+    strengths.push(
+      `Detected ${skills.length} relevant technical skill(s).`
+    );
+  }
+
+  if (strengths.length === 0) {
+    strengths.push("Resume information was successfully extracted.");
+  }
+
+  // -----------------------------
+  // Improvements
+  // -----------------------------
+
+  const improvements = [];
+
+  if (skillsScore < 70) {
+    improvements.push(
+      "Add more relevant technical skills related to the job."
+    );
+  }
+
+  if (experienceScore < 70) {
+    improvements.push(
+      "Add internships, projects, or practical experience."
+    );
+  }
+
+  if (educationScore < 70) {
+    improvements.push(
+      "Add complete education and degree details."
+    );
+  }
+
+  if (formattingScore < 70) {
+    improvements.push(
+      "Improve resume formatting and make sections easier to read."
+    );
+  }
+
+  if (!lowerText.includes("linkedin")) {
+    improvements.push("Consider adding your LinkedIn profile.");
+  }
+
+  if (!lowerText.includes("github")) {
+    improvements.push("Consider adding your GitHub profile.");
+  }
+
+  if (improvements.length === 0) {
+    improvements.push(
+      "Keep improving your resume with measurable achievements."
+    );
+  }
+
+  return {
+    score,
+    breakdown: {
+      skills: skillsScore,
+      experience: experienceScore,
+      education: educationScore,
+      formatting: formattingScore,
+    },
+    skills,
+    strengths,
+    improvements,
+  };
+}
+
+// -----------------------------
+// Upload and analyze PDF
+// -----------------------------
+
+app.post(
+  "/upload",
+  upload.single("resume"),
+  async (req, res) => {
+    let filePath = null;
+
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          error: "Please upload a PDF resume.",
+        });
+      }
+
+      filePath = req.file.path;
+
+      const dataBuffer = fs.readFileSync(filePath);
+
+      // pdf-parse v2
+      const parser = new PDFParse({
+        data: dataBuffer,
+      });
+
+      const result = await parser.getText();
+
+      await parser.destroy();
+
+      const text = result.text || "";
+
+      if (!text.trim()) {
+        return res.status(400).json({
+          success: false,
+          error:
+            "Could not extract text from this PDF. Please upload a text-based PDF.",
+        });
+      }
+
+      const analysis = analyzeResume(text);
+
+      return res.json({
+        success: true,
+        score: analysis.score,
+        breakdown: analysis.breakdown,
+        skills: analysis.skills,
+        strengths: analysis.strengths,
+        improvements: analysis.improvements,
+        text: text,
+      });
+    } catch (error) {
+      console.error("Resume analysis error:", error);
+
+      return res.status(500).json({
+        success: false,
+        error: error.message || "Failed to analyze resume.",
+      });
+    } finally {
+      // Delete uploaded temporary file
+      if (filePath && fs.existsSync(filePath)) {
+        try {
+          fs.unlinkSync(filePath);
+        } catch (deleteError) {
+          console.error(
+            "Could not delete temporary file:",
+            deleteError
+          );
+        }
+      }
+    }
+  }
+);
+
+// -----------------------------
+// Error handler
+// -----------------------------
+
+app.use((err, req, res, next) => {
+  console.error("Server error:", err);
+
+  res.status(500).json({
+    success: false,
+    error: err.message || "Something went wrong.",
+  });
 });
 
-// ==========================================
-// START SERVER
-// ==========================================
+// -----------------------------
+// Start server
+// -----------------------------
 
-app.listen(process.env.PORT || 5000, "0.0.0.0", () => {
-  console.log(
-    `Backend running on port ${process.env.PORT || 5000}`
-  );
+const PORT = process.env.PORT || 5000;
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Backend running on port ${PORT}`);
 });
