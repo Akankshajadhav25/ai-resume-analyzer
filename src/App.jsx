@@ -29,7 +29,7 @@ function App() {
     formData.append("resume", file);
 
     try {
-      const response = await fetch("https://ai-resume-analyzer-i9au.onrender.com/upload", {
+      const response = await fetch("https://ai-resume-analyzer-ia9u.onrender.com/upload", {
         method: "POST",
         body: formData,
       });
